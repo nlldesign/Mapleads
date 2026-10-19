@@ -57,4 +57,31 @@ npm start
 - [`scraper.js`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/scraper.js): Motor de extração Puppeteer integrado ao Google Chrome e verificação anti-repetição;
 - [`server.js`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/server.js): Servidor Express com upload via `multer`, rotas de download consolidado (`.xlsx`/`.csv`) e streaming de progresso;
 - [`public/index.html`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/public/index.html): Dashboard responsivo com abas de busca por raio e lote, upload de contexto e modal de ligação telefônica;
-- [`data/leads_database.json`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/data/leads_database.json): Base de dados local persistente para contexto de exclusão.
+- [`data/leads_database.json`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/data/leads_database.json): Base de dados local persistente para contexto de exclusão;
+- [`Dockerfile`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/Dockerfile): Configuração para deploy em nuvem com Chromium pré-instalado;
+- [`render.yaml`](file:///c:/Users/Lucas/Documents/antigravity/agitated-bose/render.yaml): Arquivo para deploy grátis em 1 clique no Render.com.
+
+---
+
+## ☁️ Como Fazer o Deploy Online (Grátis)
+
+Como este projeto utiliza **Node.js + Puppeteer (Navegador Chrome headless)** para minerar o Google Maps, ele não pode rodar apenas no GitHub Pages (que só aceita sites estáticos sem servidor).
+
+Ele já está 100% configurado com **Docker** para rodar em qualquer serviço gratuito de nuvem:
+
+### Opção 1: Deploy Grátis no Render.com (Recomendado)
+1. Crie uma conta gratuita em [render.com](https://render.com);
+2. Conecte sua conta do GitHub e selecione o repositório **nlldesign/Mapleads**;
+3. Escolha a opção **Web Service** usando o **Dockerfile** (o Render detectará o arquivo `render.yaml` automaticamente);
+4. Clique em **Deploy** e pronto! Sua aplicação estará online com link próprio (`.onrender.com`).
+
+### Opção 2: Deploy no Railway.app
+1. Acesse [railway.app](https://railway.app);
+2. Clique em **New Project** > **Deploy from GitHub repo** > selecione **Mapleads**;
+3. O Railway compilará o `Dockerfile` com o Chromium automaticamente.
+
+### Opção 3: Rodar com Docker localmente
+```bash
+docker-compose up --build
+```
+Acesse `http://localhost:3000`.

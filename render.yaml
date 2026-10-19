@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: mapleads
+    env: docker
+    plan: free
+    region: ohio
+    branch: main
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: /usr/bin/chromium
