@@ -9,27 +9,31 @@ const {
   saveDatabase,
   importSpreadsheet,
   addLeadsToDatabase,
-  parseBatchSearchSpreadsheet
+  parseBatchSearchSpreadsheet,
+  isLeadDuplicate
 } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuração do Multer (Upload em memória para processamento rápido)
+// Configuração do Multer (Upload em memória)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 } // Até 15MB
+  limits: { fileSize: 15 * 1024 * 1024 }
 });
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // ==========================================
 // ROTAS DE STATUS E GESTÃO DO BANCO DE LEADS
 // ==========================================
 
-// Retorna estatísticas do banco de contexto anti-repetição
 app.get('/api/database/status', (req, res) => {
   const db = loadDatabase();
   return res.json({
@@ -38,13 +42,11 @@ app.get('/api/database/status', (req, res) => {
   });
 });
 
-// Limpa o banco de leads salvos
 app.post('/api/database/clear', (req, res) => {
   saveDatabase([]);
-  return res.json({ success: true, message: 'Banco de leads limpo com sucesso.', totalLeads: 0 });
+  return res.json({ success: true, message: 'Memória limpa com sucesso.', totalLeads: 0 });
 });
 
-// Salva leads da busca atual no banco para evitar repetição futura
 app.post('/api/database/save-current', (req, res) => {
   const { leads } = req.body;
   if (!Array.isArray(leads) || leads.length === 0) {
@@ -62,12 +64,14 @@ app.post('/api/database/upload-exclusion', upload.single('file'), (req, res) => 
 
   try {
     const result = importSpreadsheet(req.file.buffer, req.file.originalname);
+    const allLeads = loadDatabase();
     return res.json({
       success: true,
       filename: req.file.originalname,
       importedCount: result.importedCount,
       skippedDuplicates: result.skippedDuplicates,
-      totalDatabase: result.totalDatabase
+      totalDatabase: result.totalDatabase,
+      leads: allLeads
     });
   } catch (error) {
     console.error('Erro ao importar planilha de exclusão:', error);
@@ -75,18 +79,11 @@ app.post('/api/database/upload-exclusion', upload.single('file'), (req, res) => 
   }
 });
 
-// Download consolidado de toda a base em formato Excel (.xlsx) ou CSV
-app.get('/api/database/download-all', (req, res) => {
-  const format = req.query.format || 'xlsx';
-  const db = loadDatabase();
-
-  if (db.length === 0) {
-    return res.status(404).send('Nenhum lead encontrado na base para exportar.');
-  }
-
-  const exportRows = db.map(l => ({
+function formatLeadsForExport(leadsList) {
+  return leadsList.map(l => ({
     'Nome da Loja': l.name || '',
     'Categoria': l.category || '',
+    'Distância (km)': l.distanceKm !== undefined && l.distanceKm !== null ? `${l.distanceKm} km` : '',
     'Nota': l.rating || '',
     'Qtd Avaliações': l.reviewsCount !== undefined ? l.reviewsCount : '',
     'Temperatura': l.temperature || '',
@@ -99,8 +96,48 @@ app.get('/api/database/download-all', (req, res) => {
     'Principais Pontos Fracos': Array.isArray(l.flaws) ? l.flaws.join(' | ') : (l.flaws || ''),
     'Script Gancho de Ligacao': l.coldCallScript?.passo2_gancho || '',
     'Mensagem WhatsApp': l.pitch || '',
-    'Data de Registro': l.discoveredAt || l.importedAt || ''
+    'Data de Registro': l.discoveredAt || l.importedAt || new Date().toISOString().slice(0, 10)
   }));
+}
+
+// Exportação via POST (garante funcionamento 100% mesmo em ambiente Serverless da Vercel)
+app.post('/api/database/export', (req, res) => {
+  const clientLeads = Array.isArray(req.body.leads) ? req.body.leads : [];
+  const serverLeads = loadDatabase();
+
+  // Combina leads do cliente e do servidor sem duplicar
+  const combined = [...serverLeads];
+  for (const cl of clientLeads) {
+    if (!isLeadDuplicate(cl, combined)) {
+      combined.push(cl);
+    }
+  }
+
+  if (combined.length === 0) {
+    return res.status(404).json({ error: 'Nenhuma loja encontrada para exportar.' });
+  }
+
+  const exportRows = formatLeadsForExport(combined);
+  const worksheet = xlsx.utils.json_to_sheet(exportRows);
+  const workbook = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(workbook, worksheet, 'Leads Qualificados');
+
+  const excelBuffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="mapleads_lista_clientes_${Date.now()}.xlsx"`);
+  return res.send(excelBuffer);
+});
+
+// Download consolidado via GET
+app.get('/api/database/download-all', (req, res) => {
+  const format = req.query.format || 'xlsx';
+  const db = loadDatabase();
+
+  if (db.length === 0) {
+    return res.status(404).send('Nenhuma loja salva na memória ainda. Faça uma busca primeiro!');
+  }
+
+  const exportRows = formatLeadsForExport(db);
 
   if (format === 'csv') {
     const headers = Object.keys(exportRows[0]);
@@ -115,7 +152,6 @@ app.get('/api/database/download-all', (req, res) => {
     return res.send(csvContent);
   }
 
-  // Formato XLSX nativo com estilo de tabela
   const worksheet = xlsx.utils.json_to_sheet(exportRows);
   const workbook = xlsx.utils.book_new();
   xlsx.utils.book_append_sheet(workbook, worksheet, 'Leads Qualificados');
@@ -127,10 +163,64 @@ app.get('/api/database/download-all', (req, res) => {
 });
 
 // ==========================================
-// ROTAS DE BUSCA E STREAMING DE RESULTADOS
+// ROTAS DE BUSCA (JSON DIRETO + STREAMING SSE)
 // ==========================================
 
-// Rota de busca individual com streaming de eventos (Server-Sent Events)
+// Rota de busca rápida JSON/POST (Ideal para Vercel Serverless e Mobile)
+app.post('/api/search', async (req, res) => {
+  const {
+    query,
+    location = '',
+    lat = null,
+    lng = null,
+    radiusKm = 5,
+    maxResults = 25,
+    maxReviews = 30,
+    onlyWithoutWebsite = false,
+    checkDuplicates = true,
+    clientKnownLeads = []
+  } = req.body;
+
+  if (!query) {
+    return res.status(400).json({ error: 'Informe o tipo de negócio que deseja buscar.' });
+  }
+
+  try {
+    const serverDb = loadDatabase();
+    const combinedExisting = [...serverDb, ...(Array.isArray(clientKnownLeads) ? clientKnownLeads : [])];
+
+    const result = await scrapeGoogleMaps(query, {
+      location,
+      lat,
+      lng,
+      radiusKm: parseFloat(radiusKm || '5'),
+      maxResults: parseInt(maxResults || '25', 10),
+      maxReviews: maxReviews ? parseInt(maxReviews, 10) : 30,
+      onlyWithoutWebsite: Boolean(onlyWithoutWebsite),
+      checkDuplicates: Boolean(checkDuplicates),
+      existingLeads: combinedExisting
+    });
+
+    const leads = result.leads || [];
+    if (leads.length > 0) {
+      addLeadsToDatabase(leads);
+    }
+
+    return res.json({
+      success: true,
+      count: leads.length,
+      duplicatesSkipped: result.duplicatesSkipped || 0,
+      totalAnalyzed: result.totalAnalyzed || 0,
+      leads,
+      totalDatabase: loadDatabase().length
+    });
+  } catch (error) {
+    console.error('Erro na busca:', error);
+    return res.status(500).json({ error: error.message || 'Erro durante a busca no Google Maps.' });
+  }
+});
+
+// Rota de busca via GET / Streaming (SSE)
 app.get('/api/search/stream', async (req, res) => {
   const query = req.query.q;
   const location = req.query.location || '';
@@ -138,7 +228,7 @@ app.get('/api/search/stream', async (req, res) => {
   const lng = req.query.lng || null;
   const radiusKm = parseFloat(req.query.radiusKm || '5');
   const maxResults = parseInt(req.query.maxResults || '25', 10);
-  const maxReviews = req.query.maxReviews ? parseInt(req.query.maxReviews, 10) : 20;
+  const maxReviews = req.query.maxReviews ? parseInt(req.query.maxReviews, 10) : 30;
   const onlyWithoutWebsite = req.query.onlyWithoutWebsite === 'true';
   const checkDuplicates = req.query.checkDuplicates !== 'false';
 
@@ -155,9 +245,9 @@ app.get('/api/search/stream', async (req, res) => {
   };
 
   try {
-    sendEvent('progress', { 
-      status: 'iniciando', 
-      message: `Iniciando prospecção para "${query}" num raio de ${radiusKm}km...` 
+    sendEvent('progress', {
+      status: 'iniciando',
+      message: `Iniciando busca para "${query}" num raio de ${radiusKm}km...`
     });
 
     const result = await scrapeGoogleMaps(query, {
@@ -177,7 +267,6 @@ app.get('/api/search/stream', async (req, res) => {
     const leads = result.leads || [];
     const duplicatesSkipped = result.duplicatesSkipped || 0;
 
-    // Salva automaticamente os novos leads encontrados no banco para context futuro
     if (leads.length > 0) {
       addLeadsToDatabase(leads);
     }
@@ -197,7 +286,7 @@ app.get('/api/search/stream', async (req, res) => {
   }
 });
 
-// Upload de planilha para Busca em Lote (Batch Searches)
+// Upload de planilha para Busca em Lote
 app.post('/api/batch-search', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'Envie um arquivo CSV ou Excel com as buscas.' });
@@ -219,7 +308,7 @@ app.post('/api/batch-search', upload.single('file'), async (req, res) => {
   }
 });
 
-if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`\n======================================================`);
     console.log(`🚀 Sistema MapLeads - Leads Frios com Contexto Anti-Duplicatas`);

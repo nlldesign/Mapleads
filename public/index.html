@@ -25,7 +25,7 @@
     }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black pb-16 sm:pb-0">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black pb-12 sm:pb-0">
 
   <!-- TOPO RESPONSIVO -->
   <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-40 shadow-sm">
@@ -40,7 +40,7 @@
           <h1 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-1.5 sm:gap-2">
             MapLeads <span class="text-[10px] sm:text-xs bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">Fácil</span>
           </h1>
-          <p class="text-[11px] sm:text-xs text-slate-400 truncate max-w-[170px] sm:max-w-none">Prospector de negócios locais</p>
+          <p class="text-[11px] sm:text-xs text-slate-400 truncate max-w-[165px] sm:max-w-none">Prospector de negócios locais</p>
         </div>
       </div>
 
@@ -58,12 +58,12 @@
         <input type="file" id="uploadExclusionInput" class="hidden" accept=".xlsx, .xls, .csv" onchange="uploadExclusionFile(event)">
 
         <!-- Botão Baixar Excel -->
-        <a href="/api/database/download-all?format=xlsx" id="btnDownloadTop"
+        <button type="button" onclick="downloadAllExcel()" id="btnDownloadTop"
           class="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 active:scale-95">
           <i data-lucide="file-spreadsheet" class="w-4 h-4 flex-shrink-0"></i>
           <span class="hidden sm:inline">Baixar Excel (<span id="topDownloadCount">0</span>)</span>
           <span class="sm:hidden">Excel (<span id="topDownloadCountMobile">0</span>)</span>
-        </a>
+        </button>
 
       </div>
     </div>
@@ -84,10 +84,15 @@
           </span>
         </div>
       </div>
-      <button onclick="document.getElementById('uploadExclusionInput').click()" class="text-cyan-400 hover:underline font-semibold flex items-center gap-1 text-[11px] sm:text-xs ml-auto sm:ml-0">
-        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-        <span>Enviar planilha antiga</span>
-      </button>
+      <div class="flex items-center gap-3 ml-auto sm:ml-0">
+        <button onclick="document.getElementById('uploadExclusionInput').click()" class="text-cyan-400 hover:underline font-semibold flex items-center gap-1 text-[11px] sm:text-xs">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span>Enviar planilha</span>
+        </button>
+        <button onclick="clearMemory()" class="text-slate-500 hover:text-rose-400 font-medium text-[11px] sm:text-xs transition">
+          Limpar
+        </button>
+      </div>
     </div>
 
     <!-- BANNER DE STATUS DO UPLOAD DE PLANILHA -->
@@ -129,7 +134,7 @@
             <input type="text" id="queryInput" required placeholder="Ex: Dentista, Mecânica, Pet Shop..."
               class="w-full px-3.5 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 text-sm font-medium">
 
-            <!-- Sugestões Rápidas (Chips Touch-friendly) -->
+            <!-- Sugestões Rápidas -->
             <div>
               <span class="text-[10px] text-slate-500 font-semibold uppercase block mb-1">Ou toque em uma opção:</span>
               <div class="flex flex-wrap gap-1.5">
@@ -212,7 +217,7 @@
         <span class="text-xs font-mono text-slate-400 ml-2" id="progressTimer">0s</span>
       </div>
       <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
-        <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full w-1/4 rounded-full transition-all duration-300"></div>
+        <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full w-1/3 rounded-full transition-all duration-300"></div>
       </div>
     </div>
 
@@ -262,13 +267,13 @@
             <span>Lojas Encontradas</span>
             <span id="badgeCount" class="text-xs bg-cyan-500/20 text-cyan-400 px-2.5 py-0.5 rounded-full border border-cyan-500/30">0</span>
           </h3>
-          <p class="text-[11px] sm:text-xs text-slate-400">Toque em "Ver o que falar" para ver o roteiro de ligação de cada loja.</p>
+          <p class="text-[11px] sm:text-xs text-slate-400">Toque em "Ver o que falar" para abrir o roteiro de ligação de cada loja.</p>
         </div>
 
-        <a href="/api/database/download-all?format=xlsx" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/20 active:scale-95">
+        <button type="button" onclick="downloadAllExcel()" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/20 active:scale-95">
           <i data-lucide="download" class="w-4 h-4"></i>
           <span>Baixar Lista Completa no Excel</span>
-        </a>
+        </button>
       </div>
 
       <!-- 1. VISÃO NO CELULAR: CARDS TOUCH-FRIENDLY (Aparece em telas < 768px) -->
@@ -315,7 +320,7 @@
           <div class="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-xs">1</div>
           <h4 class="font-bold text-white text-xs sm:text-sm">O Robô Procura</h4>
           <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
-            Ele varre o Google Maps perto de você e encontra empresas locais.
+            Ele varre o Google Maps perto de você e encontra empresas locais em segundos.
           </p>
         </div>
 
@@ -339,7 +344,7 @@
 
   </main>
 
-  <!-- MODAL: ROTEIRO DE LIGAÇÃO RESPONSIVO (ADAPTA PERFEITAMENTE AO CELULAR) -->
+  <!-- MODAL: ROTEIRO DE LIGAÇÃO RESPONSIVO -->
   <div id="callModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
     <div class="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl relative space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto custom-scrollbar">
       
@@ -439,23 +444,65 @@
   <script>
     lucide.createIcons();
 
+    const STORAGE_KEY = 'mapleads_saved_leads_v1';
     let currentLeads = [];
     let searchStartTime = null;
     let timerInterval = null;
     let userCoords = null;
 
-    updateMemoryStatus();
-
-    async function updateMemoryStatus() {
+    function getSavedLeadsFromStorage() {
       try {
-        const res = await fetch('/api/database/status');
-        const data = await res.json();
-        const total = data.totalLeads || 0;
-        document.getElementById('dbCountText').innerText = `${total} lojas`;
-        document.getElementById('topDownloadCount').innerText = `${total}`;
-        document.getElementById('topDownloadCountMobile').innerText = `${total}`;
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveLeadsToStorage(newLeads) {
+      try {
+        const existing = getSavedLeadsFromStorage();
+        const seen = new Set(existing.map(l => `${(l.name || '').toLowerCase()}_${(l.phone || '').replace(/\D/g, '')}`));
+        for (const item of newLeads) {
+          const key = `${(item.name || '').toLowerCase()}_${(item.phone || '').replace(/\D/g, '')}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            existing.push(item);
+          }
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(existing));
+        updateMemoryStatus();
       } catch (_) {}
     }
+
+    async function clearMemory() {
+      if (!confirm('Deseja limpar todas as lojas salvas da memória anti-repetição?')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      try {
+        await fetch('/api/database/clear', { method: 'POST' });
+      } catch (_) {}
+      updateMemoryStatus();
+      showUploadAlert('Memória anti-repetição limpa com sucesso!', 'success');
+    }
+
+    async function updateMemoryStatus() {
+      const localLeads = getSavedLeadsFromStorage();
+      let serverTotal = 0;
+      try {
+        const res = await fetch('/api/database/status');
+        if (res.ok) {
+          const data = await res.json();
+          serverTotal = data.totalLeads || 0;
+        }
+      } catch (_) {}
+
+      const total = Math.max(localLeads.length, serverTotal);
+      document.getElementById('dbCountText').innerText = `${total} lojas`;
+      document.getElementById('topDownloadCount').innerText = `${total}`;
+      document.getElementById('topDownloadCountMobile').innerText = `${total}`;
+    }
+
+    updateMemoryStatus();
 
     function setFastNiche(name) {
       document.getElementById('queryInput').value = name;
@@ -500,6 +547,9 @@
         const res = await fetch('/api/database/upload-exclusion', { method: 'POST', body: formData });
         const data = await res.json();
         if (data.success) {
+          if (Array.isArray(data.leads)) {
+            saveLeadsToStorage(data.leads);
+          }
           showUploadAlert(
             `✅ Perfeito! ${data.importedCount} lojas foram adicionadas à memória anti-repetição. O sistema não repetirá nenhuma delas!`, 
             'success'
@@ -512,6 +562,40 @@
         showUploadAlert(`❌ Erro: ${err.message}`, 'error');
       } finally {
         event.target.value = '';
+      }
+    }
+
+    // Download Excel Consolidado
+    async function downloadAllExcel() {
+      const savedLeads = getSavedLeadsFromStorage();
+      const allToExport = savedLeads.length > 0 ? savedLeads : currentLeads;
+
+      if (!allToExport || allToExport.length === 0) {
+        alert('Nenhuma loja salva ainda! Faça uma busca primeiro para baixar a lista no Excel.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/database/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ leads: allToExport })
+        });
+
+        if (!res.ok) {
+          throw new Error('Erro ao gerar planilha Excel.');
+        }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `mapleads_clientes_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        alert('Erro ao baixar Excel: ' + err.message);
       }
     }
 
@@ -537,8 +621,8 @@
       lucide.createIcons();
     }
 
-    // Busca
-    function startSearch(e) {
+    // Busca Rápida e Confiável (Compatível com Vercel e Local)
+    async function startSearch(e) {
       e.preventDefault();
       const query = document.getElementById('queryInput').value.trim();
       const location = document.getElementById('locationInput').value.trim();
@@ -558,73 +642,73 @@
       const progressMessage = document.getElementById('progressMessage');
       const progressTimer = document.getElementById('progressTimer');
 
-      progressBar.style.width = '20%';
-      progressMessage.innerText = 'Abrindo Google Maps...';
+      progressBar.style.width = '35%';
+      progressMessage.innerText = `Buscando "${query}" no Google Maps...`;
 
       searchStartTime = Date.now();
       clearInterval(timerInterval);
       timerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - searchStartTime) / 1000);
         progressTimer.innerText = `${elapsed}s`;
-      }, 1000);
+        if (elapsed === 1) progressBar.style.width = '65%';
+        if (elapsed >= 2) progressBar.style.width = '85%';
+      }, 600);
 
-      const params = new URLSearchParams({
-        q: query,
-        location: location,
-        radiusKm: radiusKm,
-        maxResults: 25,
-        onlyWithoutWebsite: onlyWithoutWebsite,
-        checkDuplicates: 'true'
-      });
+      try {
+        const clientKnownLeads = getSavedLeadsFromStorage().map(l => ({
+          name: l.name,
+          phone: l.phone,
+          mapsUrl: l.mapsUrl,
+          normName: (l.name || '').toLowerCase().trim(),
+          normPhone: (l.phone || '').replace(/\D/g, ''),
+          normMaps: (l.mapsUrl || '').toLowerCase().trim()
+        }));
 
-      if (userCoords) {
-        params.append('lat', userCoords.lat);
-        params.append('lng', userCoords.lng);
-      }
+        const payload = {
+          query,
+          location,
+          radiusKm: parseFloat(radiusKm || '5'),
+          maxResults: 25,
+          onlyWithoutWebsite,
+          checkDuplicates: true,
+          clientKnownLeads
+        };
 
-      const eventSource = new EventSource(`/api/search/stream?${params.toString()}`);
+        if (userCoords) {
+          payload.lat = userCoords.lat;
+          payload.lng = userCoords.lng;
+        }
 
-      eventSource.addEventListener('progress', (e) => {
-        const data = JSON.parse(e.data);
-        progressMessage.innerText = data.message;
-        if (data.status === 'geocodificando') progressBar.style.width = '30%';
-        if (data.status === 'navegando') progressBar.style.width = '50%';
-        if (data.status === 'rolando') progressBar.style.width = '70%';
-        if (data.status === 'extraindo') progressBar.style.width = '85%';
-        if (data.status === 'filtrando') progressBar.style.width = '95%';
-      });
+        const res = await fetch('/api/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-      eventSource.addEventListener('result', (e) => {
+        const data = await res.json();
         clearInterval(timerInterval);
         progressBar.style.width = '100%';
-        const data = JSON.parse(e.data);
-        eventSource.close();
 
         document.getElementById('searchBtn').disabled = false;
         document.getElementById('progressContainer').classList.add('hidden');
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Erro ao buscar no Google Maps.');
+        }
 
         currentLeads = data.leads || [];
+        if (currentLeads.length > 0) {
+          saveLeadsToStorage(currentLeads);
+        }
         renderResults(currentLeads, data.duplicatesSkipped || 0);
         updateMemoryStatus();
-      });
-
-      eventSource.addEventListener('error', (e) => {
+      } catch (err) {
         clearInterval(timerInterval);
-        eventSource.close();
         document.getElementById('searchBtn').disabled = false;
         document.getElementById('progressContainer').classList.add('hidden');
-
-        let msg = 'Erro ao buscar no Google Maps. Tente novamente.';
-        try {
-          if (e.data) {
-            const parsed = JSON.parse(e.data);
-            if (parsed.message) msg = parsed.message;
-          }
-        } catch (_) {}
-
-        document.getElementById('errorMessage').innerText = msg;
+        document.getElementById('errorMessage').innerText = err.message || 'Erro ao buscar no Google Maps. Tente novamente.';
         document.getElementById('errorBanner').classList.remove('hidden');
-      });
+      }
     }
 
     function renderResults(leads, duplicatesSkipped = 0) {
@@ -639,7 +723,7 @@
             <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
             Nenhuma loja nova encontrada com esses filtros.<br>
             ${duplicatesSkipped > 0 ? `<strong class="text-amber-400">${duplicatesSkipped} lojas repetidas já estavam salvas na memória e foram ignoradas.</strong><br>` : ''}
-            Tente aumentar o raio em km ou buscar por outro nicho.
+            Tente aumentar o raio em km ou desmarcar a opção "Apenas lojas SEM site".
           </div>
         `;
         mobileContainer.innerHTML = emptyHtml;

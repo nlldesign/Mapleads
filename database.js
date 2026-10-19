@@ -1,11 +1,14 @@
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const xlsx = require('xlsx');
 
-const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, 'data');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+const DATA_DIR = isServerless ? path.join(os.tmpdir(), 'mapleads_data') : path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'leads_database.json');
 
-// Garante que o diretório data existe
+let memoryDb = [];
+
 try {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -13,23 +16,30 @@ try {
 } catch (_) {}
 
 function loadDatabase() {
-  if (!fs.existsSync(DB_FILE)) {
-    return [];
-  }
   try {
-    const raw = fs.readFileSync(DB_FILE, 'utf-8');
-    return JSON.parse(raw);
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        memoryDb = parsed;
+        return memoryDb;
+      }
+    }
   } catch (err) {
-    console.error('Erro ao ler banco de dados de leads:', err);
-    return [];
+    console.warn('Usando banco em memória:', err.message);
   }
+  return memoryDb;
 }
 
 function saveDatabase(leads) {
+  memoryDb = Array.isArray(leads) ? leads : [];
   try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(leads, null, 2), 'utf-8');
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(DB_FILE, JSON.stringify(memoryDb, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Erro ao salvar banco de dados de leads:', err);
+    console.warn('Salvo apenas em memória:', err.message);
   }
 }
 
