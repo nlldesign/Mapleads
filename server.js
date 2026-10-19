@@ -219,9 +219,13 @@ app.post('/api/batch-search', upload.single('file'), async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 Sistema MapLeads - Leads Frios com Contexto Anti-Duplicatas`);
-  console.log(`👉 Acesse no navegador: http://localhost:${PORT}`);
-  console.log(`======================================================\n`);
-});
+if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 Sistema MapLeads - Leads Frios com Contexto Anti-Duplicatas`);
+    console.log(`👉 Acesse no navegador: http://localhost:${PORT}`);
+    console.log(`======================================================\n`);
+  });
+}
+
+module.exports = app;

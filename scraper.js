@@ -2,6 +2,11 @@ const puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const { loadDatabase, isLeadDuplicate } = require('./database');
 
+let sparticuzChromium = null;
+try {
+  sparticuzChromium = require('@sparticuz/chromium');
+} catch (_) {}
+
 function getBrowserPath() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
@@ -228,25 +233,39 @@ async function scrapeGoogleMaps(query, options = {}) {
   const currentDb = existingLeads || (checkDuplicates ? loadDatabase() : []);
   let duplicatesSkipped = 0;
 
-  const chromePath = getBrowserPath();
-  if (!chromePath) {
-    throw new Error('Nenhum navegador (Chrome ou Edge) foi encontrado no sistema.');
+  let browser;
+  const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+  if (isServerless && sparticuzChromium) {
+    onProgress({ status: 'iniciando', message: 'Iniciando navegador em nuvem (Vercel)...' });
+    const execPath = await sparticuzChromium.executablePath();
+    browser = await puppeteer.launch({
+      args: [...sparticuzChromium.args, '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--lang=pt-BR,pt'],
+      defaultViewport: sparticuzChromium.defaultViewport,
+      executablePath: execPath,
+      headless: sparticuzChromium.headless,
+    });
+  } else {
+    const chromePath = getBrowserPath();
+    if (!chromePath) {
+      throw new Error('Nenhum navegador (Chrome ou Edge) foi encontrado no sistema.');
+    }
+
+    onProgress({ status: 'iniciando', message: 'Iniciando navegador com alta performance...' });
+
+    browser = await puppeteer.launch({
+      executablePath: chromePath,
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--lang=pt-BR,pt'
+      ]
+    });
   }
-
-  onProgress({ status: 'iniciando', message: 'Iniciando navegador com alta performance...' });
-
-  const browser = await puppeteer.launch({
-    executablePath: chromePath,
-    headless: 'new',
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--disable-gpu',
-      '--lang=pt-BR,pt'
-    ]
-  });
 
   try {
     const page = await browser.newPage();

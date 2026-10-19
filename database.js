@@ -2,13 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.VERCEL ? path.join('/tmp', 'data') : path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'leads_database.json');
 
 // Garante que o diretório data existe
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+} catch (_) {}
 
 function loadDatabase() {
   if (!fs.existsSync(DB_FILE)) {
