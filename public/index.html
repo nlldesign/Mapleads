@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MapLeads - Encontrar Clientes no Google Maps</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black pb-16 sm:pb-0">
+
+  <!-- TOPO RESPONSIVO -->
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-40 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-2">
+      
+      <!-- Logo Amigável -->
+      <div class="flex items-center space-x-2.5 sm:space-x-3">
+        <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 flex-shrink-0">
+          <i data-lucide="map-pin" class="w-5 h-5 sm:w-6 sm:h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-1.5 sm:gap-2">
+            MapLeads <span class="text-[10px] sm:text-xs bg-emerald-500/20 text-emerald-400 font-semibold px-2 py-0.5 rounded-full border border-emerald-500/30">Fácil</span>
+          </h1>
+          <p class="text-[11px] sm:text-xs text-slate-400 truncate max-w-[170px] sm:max-w-none">Prospector de negócios locais</p>
+        </div>
+      </div>
+
+      <!-- Ações no Topo (Responsivas) -->
+      <div class="flex items-center gap-1.5 sm:gap-2.5">
+        
+        <!-- Botão Subir Planilha -->
+        <button onclick="document.getElementById('uploadExclusionInput').click()" 
+          class="px-2.5 sm:px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-sm active:scale-95"
+          title="Envie uma planilha antiga para o sistema não repetir lojas">
+          <i data-lucide="file-up" class="w-4 h-4 text-amber-400 flex-shrink-0"></i>
+          <span class="hidden md:inline">Subir Planilha</span>
+          <span class="md:hidden">Subir</span>
+        </button>
+        <input type="file" id="uploadExclusionInput" class="hidden" accept=".xlsx, .xls, .csv" onchange="uploadExclusionFile(event)">
+
+        <!-- Botão Baixar Excel -->
+        <a href="/api/database/download-all?format=xlsx" id="btnDownloadTop"
+          class="px-3 sm:px-4 py-2 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 active:scale-95">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 flex-shrink-0"></i>
+          <span class="hidden sm:inline">Baixar Excel (<span id="topDownloadCount">0</span>)</span>
+          <span class="sm:hidden">Excel (<span id="topDownloadCountMobile">0</span>)</span>
+        </a>
+
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-3.5 sm:px-6 py-4 sm:py-6 flex-1 w-full space-y-5 sm:space-y-6">
+
+    <!-- MEMÓRIA ANTI-REPETIÇÃO (COMPACTO NO MOBILE) -->
+    <div id="memoryCard" class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-2.5 text-xs shadow-sm">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <span class="font-bold text-white block text-xs">Proteção contra lojas repetidas:</span>
+          <span class="text-slate-400 text-[11px] sm:text-xs">
+            <strong id="dbCountText" class="text-cyan-400 font-bold">0 lojas</strong> salvas (não repetirá nenhuma).
+          </span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('uploadExclusionInput').click()" class="text-cyan-400 hover:underline font-semibold flex items-center gap-1 text-[11px] sm:text-xs ml-auto sm:ml-0">
+        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+        <span>Enviar planilha antiga</span>
+      </button>
+    </div>
+
+    <!-- BANNER DE STATUS DO UPLOAD DE PLANILHA -->
+    <div id="uploadAlert" class="hidden p-3.5 sm:p-4 rounded-xl text-xs border flex items-center justify-between transition-all">
+      <div class="flex items-center gap-2.5">
+        <i id="uploadAlertIcon" data-lucide="check-circle" class="w-4 h-4 flex-shrink-0"></i>
+        <span id="uploadAlertText">Planilha processada!</span>
+      </div>
+      <button onclick="document.getElementById('uploadAlert').classList.add('hidden')" class="text-slate-400 hover:text-white p-1">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- ÁREA PRINCIPAL: BUSCA GUIADA (1, 2, 3) -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl space-y-5 relative overflow-hidden">
+      <div class="absolute -right-24 -top-24 w-80 h-80 sm:w-96 sm:h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Título -->
+      <div>
+        <h2 class="text-xl sm:text-2xl font-extrabold text-white tracking-tight mb-1">
+          O que você quer encontrar hoje?
+        </h2>
+        <p class="text-xs sm:text-sm text-slate-400">
+          Preencha os passos abaixo para achar lojas no Google Maps que precisam de ajuda para vender.
+        </p>
+      </div>
+
+      <!-- FORMULÁRIO -->
+      <form id="searchForm" onsubmit="startSearch(event)" class="space-y-4 sm:space-y-6">
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-5">
+          
+          <!-- PASSO 1: TIPO DE NEGÓCIO -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-cyan-500 text-slate-950 font-extrabold text-xs flex items-center justify-center flex-shrink-0">1</span>
+              <label class="text-xs sm:text-sm font-bold text-white">Tipo de Negócio</label>
+            </div>
+            <input type="text" id="queryInput" required placeholder="Ex: Dentista, Mecânica, Pet Shop..."
+              class="w-full px-3.5 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 text-sm font-medium">
+
+            <!-- Sugestões Rápidas (Chips Touch-friendly) -->
+            <div>
+              <span class="text-[10px] text-slate-500 font-semibold uppercase block mb-1">Ou toque em uma opção:</span>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" onclick="setFastNiche('Dentista')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-slate-200 rounded-lg text-xs transition">🦷 Dentista</button>
+                <button type="button" onclick="setFastNiche('Oficina mecânica')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-slate-200 rounded-lg text-xs transition">🔧 Mecânica</button>
+                <button type="button" onclick="setFastNiche('Pet Shop')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-slate-200 rounded-lg text-xs transition">🐶 Pet Shop</button>
+                <button type="button" onclick="setFastNiche('Barbearia')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 active:bg-cyan-900 text-slate-200 rounded-lg text-xs transition">✂️ Barbearia</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASSO 2: CIDADE OU BAIRRO -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+            <div class="flex items-center gap-2">
+              <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-cyan-500 text-slate-950 font-extrabold text-xs flex items-center justify-center flex-shrink-0">2</span>
+              <label class="text-xs sm:text-sm font-bold text-white">Cidade ou Bairro</label>
+            </div>
+            <input type="text" id="locationInput" placeholder="Ex: Campinas SP, Pinheiros..."
+              class="w-full px-3.5 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 text-sm font-medium">
+
+            <!-- Botão GPS Mobile -->
+            <button type="button" onclick="detectUserLocation()" id="btnGps"
+              class="w-full py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-700 text-cyan-300 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition border border-slate-700">
+              <i data-lucide="locate-fixed" class="w-4 h-4 flex-shrink-0"></i>
+              <span id="gpsText">📍 Pegar Meu GPS Atual</span>
+            </button>
+            <div id="gpsBanner" class="hidden text-[11px] text-emerald-400 text-center font-medium">
+              ✅ GPS conectado com sucesso!
+            </div>
+          </div>
+
+          <!-- PASSO 3: DISTÂNCIA (RAIO) -->
+          <div class="bg-slate-950/70 border border-slate-800 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-2.5 flex flex-col justify-between">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-cyan-500 text-slate-950 font-extrabold text-xs flex items-center justify-center flex-shrink-0">3</span>
+                <label class="text-xs sm:text-sm font-bold text-white">Distância (Raio)</label>
+              </div>
+              <select id="radiusKm" class="w-full px-3.5 py-3 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-cyan-400 text-sm font-medium">
+                <option value="2">Até 2 km (Bem pertinho)</option>
+                <option value="5" selected>Até 5 km (Recomendado)</option>
+                <option value="10">Até 10 km (Bairro e vizinhos)</option>
+                <option value="20">Até 20 km (Cidade inteira)</option>
+                <option value="50">Até 50 km (Região ampla)</option>
+              </select>
+            </div>
+
+            <div class="pt-1">
+              <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input type="checkbox" id="onlyWithoutWebsite" class="rounded bg-slate-900 border-slate-700 text-cyan-500 focus:ring-cyan-500 w-4 h-4">
+                <span>Apenas lojas <strong class="text-white">SEM site</strong></span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- BOTÃO GIGANTE DE AÇÃO -->
+        <div class="pt-1">
+          <button type="submit" id="searchBtn"
+            class="w-full py-4 bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white font-extrabold rounded-2xl shadow-xl shadow-cyan-500/25 flex items-center justify-center gap-2.5 sm:gap-3 text-sm sm:text-base transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+            <i data-lucide="search" class="w-5 h-5"></i>
+            <span>ENCONTRAR CLIENTES NO GOOGLE MAPS</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- BARRA DE PROGRESSO ANIMADA -->
+    <div id="progressContainer" class="hidden bg-slate-900 border border-cyan-500/40 rounded-2xl p-4 sm:p-6 shadow-xl space-y-3">
+      <div class="flex items-center justify-between text-xs sm:text-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-5 h-5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+          <div>
+            <span id="progressMessage" class="text-cyan-300 font-bold block text-xs sm:text-sm">Procurando lojas no Google Maps...</span>
+            <span class="text-[11px] sm:text-xs text-slate-400">Separando as lojas sem site e com poucas notas</span>
+          </div>
+        </div>
+        <span class="text-xs font-mono text-slate-400 ml-2" id="progressTimer">0s</span>
+      </div>
+      <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden p-0.5 border border-slate-800">
+        <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full w-1/4 rounded-full transition-all duration-300"></div>
+      </div>
+    </div>
+
+    <!-- MENSAGEM DE ERRO -->
+    <div id="errorBanner" class="hidden bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-2xl text-xs flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="alert-circle" class="w-5 h-5 text-rose-400 flex-shrink-0"></i>
+        <span id="errorMessage">Algo deu errado na busca.</span>
+      </div>
+      <button onclick="document.getElementById('errorBanner').classList.add('hidden')" class="text-rose-400 hover:text-white font-semibold p-1">Fechar</button>
+    </div>
+
+    <!-- CARDS DE RESUMO / MÉTRICAS -->
+    <div id="metricsSection" class="hidden grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+        <span class="text-[11px] sm:text-xs text-slate-400 block mb-1">Novas Lojas</span>
+        <p id="metricTotal" class="text-xl sm:text-2xl font-extrabold text-white">0</p>
+        <span id="metricDuplicatesNote" class="text-[10px] sm:text-[11px] text-cyan-400 block mt-0.5">0 repetidas ignoradas</span>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+        <span class="text-[11px] sm:text-xs text-slate-400 block mb-1">Lojas SEM Site</span>
+        <p id="metricNoWebsite" class="text-xl sm:text-2xl font-extrabold text-amber-400">0</p>
+        <span class="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">Para vender site</span>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+        <span class="text-[11px] sm:text-xs text-slate-400 block mb-1">Poucas Notas (&lt;10)</span>
+        <p id="metricFewReviews" class="text-xl sm:text-2xl font-extrabold text-rose-400">0</p>
+        <span class="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">Pouca visibilidade</span>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3 sm:p-4">
+        <span class="text-[11px] sm:text-xs text-slate-400 block mb-1">Com Telefone</span>
+        <p id="metricWithPhone" class="text-xl sm:text-2xl font-extrabold text-emerald-400">0</p>
+        <span class="text-[10px] sm:text-[11px] text-slate-400 block mt-0.5">Prontas para ligar</span>
+      </div>
+    </div>
+
+    <!-- RESULTADOS: DUPLO LAYOUT (CARDS NO CELULAR + TABELA NO COMPUTADOR) -->
+    <div id="resultsCard" class="hidden bg-slate-900 border border-slate-800 rounded-2xl sm:rounded-3xl overflow-hidden shadow-xl space-y-3 sm:space-y-4">
+      
+      <!-- Cabeçalho -->
+      <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/60">
+        <div>
+          <h3 class="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+            <span>Lojas Encontradas</span>
+            <span id="badgeCount" class="text-xs bg-cyan-500/20 text-cyan-400 px-2.5 py-0.5 rounded-full border border-cyan-500/30">0</span>
+          </h3>
+          <p class="text-[11px] sm:text-xs text-slate-400">Toque em "Ver o que falar" para ver o roteiro de ligação de cada loja.</p>
+        </div>
+
+        <a href="/api/database/download-all?format=xlsx" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition shadow-lg shadow-emerald-600/20 active:scale-95">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Baixar Lista Completa no Excel</span>
+        </a>
+      </div>
+
+      <!-- 1. VISÃO NO CELULAR: CARDS TOUCH-FRIENDLY (Aparece em telas < 768px) -->
+      <div id="mobileCardsContainer" class="md:hidden space-y-3 px-3 pb-3">
+        <!-- Injetado dinamicamente no mobile -->
+      </div>
+
+      <!-- 2. VISÃO NO COMPUTADOR: TABELA COMPLETA (Aparece em telas >= 768px) -->
+      <div class="hidden md:block overflow-x-auto custom-scrollbar px-2 pb-4">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider text-[11px] border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-4">Nome da Loja</th>
+              <th class="py-3 px-3">Links</th>
+              <th class="py-3 px-3">Notas no Google</th>
+              <th class="py-3 px-3">Telefone</th>
+              <th class="py-3 px-3">O que ela precisa</th>
+              <th class="py-3 px-4 text-center">Como Abordar</th>
+            </tr>
+          </thead>
+          <tbody id="leadsTableBody" class="divide-y divide-slate-800 text-slate-300">
+            <!-- Injetado dinamicamente no desktop -->
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- GUIA DE AJUDA PARA INICIANTES -->
+    <div id="welcomeGuide" class="bg-slate-900/60 border border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 space-y-5 text-center max-w-4xl mx-auto">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto border border-cyan-500/20">
+        <i data-lucide="compass" class="w-6 h-6 sm:w-7 sm:h-7"></i>
+      </div>
+
+      <div class="max-w-xl mx-auto space-y-1.5">
+        <h3 class="text-base sm:text-xl font-bold text-white">Como funciona para quem nunca usou?</h3>
+        <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
+          O sistema faz todo o trabalho duro e te entrega a lista pronta para ligar direto pelo celular ou mandar WhatsApp.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2">
+        <div class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-1.5">
+          <div class="w-7 h-7 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-xs">1</div>
+          <h4 class="font-bold text-white text-xs sm:text-sm">O Robô Procura</h4>
+          <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
+            Ele varre o Google Maps perto de você e encontra empresas locais.
+          </p>
+        </div>
+
+        <div class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-1.5">
+          <div class="w-7 h-7 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-xs">2</div>
+          <h4 class="font-bold text-white text-xs sm:text-sm">Ele Acha as Falhas</h4>
+          <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
+            Separa quem não tem site ou tem poucas notas (mais fáceis de fechar).
+          </p>
+        </div>
+
+        <div class="p-3.5 bg-slate-950 rounded-2xl border border-slate-800/80 space-y-1.5">
+          <div class="w-7 h-7 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs">3</div>
+          <h4 class="font-bold text-white text-xs sm:text-sm">Você Liga com Roteiro</h4>
+          <p class="text-[11px] sm:text-xs text-slate-400 leading-relaxed">
+            Você tem uma "cola" na tela dizendo exatamente o que falar para o dono.
+          </p>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL: ROTEIRO DE LIGAÇÃO RESPONSIVO (ADAPTA PERFEITAMENTE AO CELULAR) -->
+  <div id="callModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+    <div class="bg-slate-900 border border-slate-800 rounded-t-3xl sm:rounded-3xl max-w-xl w-full p-5 sm:p-7 shadow-2xl relative space-y-4 max-h-[92vh] sm:max-h-[90vh] overflow-y-auto custom-scrollbar">
+      
+      <!-- Cabeçalho do Modal -->
+      <div class="flex items-start justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="phone-call" class="w-4 h-4 sm:w-5 sm:h-5"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-white text-sm sm:text-base">O que falar nesta ligação</h4>
+            <p class="text-[11px] sm:text-xs text-slate-400 truncate max-w-[220px] sm:max-w-xs">Loja: <strong id="modalStoreName" class="text-cyan-300">...</strong></p>
+          </div>
+        </div>
+        <button onclick="closeCallModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Telefone e Ações Diretas no Celular -->
+      <div class="p-3 bg-slate-950 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+        <div>
+          <span class="text-slate-400 block text-[10px]">Número de telefone:</span>
+          <span id="modalPhone" class="text-emerald-400 font-mono font-extrabold text-sm block">...</span>
+        </div>
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <a id="modalCallBtn" href="#" class="flex-1 sm:flex-initial text-center px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-sm active:scale-95">
+            <i data-lucide="phone" class="w-3.5 h-3.5"></i>
+            <span>Ligar Agora</span>
+          </a>
+          <a id="modalMapsLink" target="_blank" href="#" class="flex-1 sm:flex-initial text-center px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Ver no Maps</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- PASSO A PASSO DA CONVERSA -->
+      <div class="space-y-2.5">
+        <h5 class="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+          <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+          <span>O que falar ao telefone:</span>
+        </h5>
+
+        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 block">1. Quem atender (Secretária / Recepção):</span>
+          <p id="modalPasso1" class="text-xs text-slate-200 italic leading-relaxed"></p>
+        </div>
+
+        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 block">2. Quando o dono/gerente atender:</span>
+          <p id="modalPasso2" class="text-xs text-slate-200 italic leading-relaxed"></p>
+        </div>
+
+        <div class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-1">
+          <span class="text-[10px] font-bold text-slate-400 block">3. Pergunta para fazer ele refletir:</span>
+          <p id="modalPasso3" class="text-xs text-slate-200 italic leading-relaxed"></p>
+        </div>
+
+        <div class="p-3 bg-cyan-950/30 rounded-xl border border-cyan-800/50 space-y-1">
+          <span class="text-[10px] font-bold text-cyan-300 block">4. Como marcar a reunião (Fechamento):</span>
+          <p id="modalPasso4" class="text-xs text-slate-200 italic leading-relaxed"></p>
+        </div>
+      </div>
+
+      <!-- Objeções Rápidas -->
+      <div class="space-y-1.5 pt-2 border-t border-slate-800 text-xs">
+        <h5 class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Se o dono falar:</h5>
+        <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+          <strong class="text-rose-400 block mb-0.5 text-[11px]">"Não tenho tempo agora"</strong>
+          <p class="text-slate-300 italic text-[11px]">Diga: "Imagino a correria! Por isso mesmo a conversa é de 5 minutos. Quinta às 15h fica melhor para você?"</p>
+        </div>
+        <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+          <strong class="text-rose-400 block mb-0.5 text-[11px]">"Manda no WhatsApp"</strong>
+          <p class="text-slate-300 italic text-[11px]">Diga: "Com certeza! Já tenho o número aqui. Te mando os detalhes e podemos conversar quinta às 15h?"</p>
+        </div>
+      </div>
+
+      <!-- Rodapé do Modal -->
+      <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+        <a id="modalWaBtn" target="_blank" href="#" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-semibold">
+          <i data-lucide="message-circle" class="w-4 h-4"></i>
+          <span>Mandar WhatsApp</span>
+        </a>
+        <button onclick="closeCallModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition">
+          Fechar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <footer class="border-t border-slate-800 py-3 text-center text-[11px] text-slate-500">
+    MapLeads &copy; 2026 - Otimizado para Computador e Celular
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    let currentLeads = [];
+    let searchStartTime = null;
+    let timerInterval = null;
+    let userCoords = null;
+
+    updateMemoryStatus();
+
+    async function updateMemoryStatus() {
+      try {
+        const res = await fetch('/api/database/status');
+        const data = await res.json();
+        const total = data.totalLeads || 0;
+        document.getElementById('dbCountText').innerText = `${total} lojas`;
+        document.getElementById('topDownloadCount').innerText = `${total}`;
+        document.getElementById('topDownloadCountMobile').innerText = `${total}`;
+      } catch (_) {}
+    }
+
+    function setFastNiche(name) {
+      document.getElementById('queryInput').value = name;
+      document.getElementById('locationInput').focus();
+    }
+
+    // GPS no Celular e Desktop
+    function detectUserLocation() {
+      const btnText = document.getElementById('gpsText');
+      if (!navigator.geolocation) {
+        alert('Seu navegador não tem suporte a GPS.');
+        return;
+      }
+      btnText.innerText = 'Pegando GPS...';
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          userCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          btnText.innerText = '📍 GPS Conectado!';
+          document.getElementById('gpsBanner').classList.remove('hidden');
+          document.getElementById('locationInput').placeholder = 'Localização do seu GPS ativa';
+        },
+        (err) => {
+          btnText.innerText = '📍 Pegar Meu GPS Atual';
+          alert('Não foi possível pegar a localização. Digite sua cidade manualmente.');
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+
+    // Upload de Planilha
+    async function uploadExclusionFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      showUploadAlert('Processando sua planilha...', 'loading');
+
+      try {
+        const res = await fetch('/api/database/upload-exclusion', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.success) {
+          showUploadAlert(
+            `✅ Perfeito! ${data.importedCount} lojas foram adicionadas à memória anti-repetição. O sistema não repetirá nenhuma delas!`, 
+            'success'
+          );
+          updateMemoryStatus();
+        } else {
+          showUploadAlert(`❌ Erro: ${data.error || 'Falha ao processar'}`, 'error');
+        }
+      } catch (err) {
+        showUploadAlert(`❌ Erro: ${err.message}`, 'error');
+      } finally {
+        event.target.value = '';
+      }
+    }
+
+    function showUploadAlert(msg, type) {
+      const banner = document.getElementById('uploadAlert');
+      const text = document.getElementById('uploadAlertText');
+      const icon = document.getElementById('uploadAlertIcon');
+
+      banner.classList.remove('hidden', 'bg-cyan-950/40', 'border-cyan-800', 'text-cyan-300', 'bg-emerald-950/40', 'border-emerald-800', 'text-emerald-300', 'bg-rose-950/40', 'border-rose-800', 'text-rose-300');
+
+      if (type === 'success') {
+        banner.classList.add('bg-emerald-950/40', 'border-emerald-800', 'text-emerald-300');
+        icon.setAttribute('data-lucide', 'check-circle');
+      } else if (type === 'error') {
+        banner.classList.add('bg-rose-950/40', 'border-rose-800', 'text-rose-300');
+        icon.setAttribute('data-lucide', 'alert-circle');
+      } else {
+        banner.classList.add('bg-cyan-950/40', 'border-cyan-800', 'text-cyan-300');
+        icon.setAttribute('data-lucide', 'loader');
+      }
+
+      text.innerText = msg;
+      lucide.createIcons();
+    }
+
+    // Busca
+    function startSearch(e) {
+      e.preventDefault();
+      const query = document.getElementById('queryInput').value.trim();
+      const location = document.getElementById('locationInput').value.trim();
+      const radiusKm = document.getElementById('radiusKm').value;
+      const onlyWithoutWebsite = document.getElementById('onlyWithoutWebsite').checked;
+
+      if (!query) return;
+
+      document.getElementById('searchBtn').disabled = true;
+      document.getElementById('welcomeGuide').classList.add('hidden');
+      document.getElementById('errorBanner').classList.add('hidden');
+      document.getElementById('progressContainer').classList.remove('hidden');
+      document.getElementById('resultsCard').classList.add('hidden');
+      document.getElementById('metricsSection').classList.add('hidden');
+
+      const progressBar = document.getElementById('progressBar');
+      const progressMessage = document.getElementById('progressMessage');
+      const progressTimer = document.getElementById('progressTimer');
+
+      progressBar.style.width = '20%';
+      progressMessage.innerText = 'Abrindo Google Maps...';
+
+      searchStartTime = Date.now();
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - searchStartTime) / 1000);
+        progressTimer.innerText = `${elapsed}s`;
+      }, 1000);
+
+      const params = new URLSearchParams({
+        q: query,
+        location: location,
+        radiusKm: radiusKm,
+        maxResults: 25,
+        onlyWithoutWebsite: onlyWithoutWebsite,
+        checkDuplicates: 'true'
+      });
+
+      if (userCoords) {
+        params.append('lat', userCoords.lat);
+        params.append('lng', userCoords.lng);
+      }
+
+      const eventSource = new EventSource(`/api/search/stream?${params.toString()}`);
+
+      eventSource.addEventListener('progress', (e) => {
+        const data = JSON.parse(e.data);
+        progressMessage.innerText = data.message;
+        if (data.status === 'geocodificando') progressBar.style.width = '30%';
+        if (data.status === 'navegando') progressBar.style.width = '50%';
+        if (data.status === 'rolando') progressBar.style.width = '70%';
+        if (data.status === 'extraindo') progressBar.style.width = '85%';
+        if (data.status === 'filtrando') progressBar.style.width = '95%';
+      });
+
+      eventSource.addEventListener('result', (e) => {
+        clearInterval(timerInterval);
+        progressBar.style.width = '100%';
+        const data = JSON.parse(e.data);
+        eventSource.close();
+
+        document.getElementById('searchBtn').disabled = false;
+        document.getElementById('progressContainer').classList.add('hidden');
+
+        currentLeads = data.leads || [];
+        renderResults(currentLeads, data.duplicatesSkipped || 0);
+        updateMemoryStatus();
+      });
+
+      eventSource.addEventListener('error', (e) => {
+        clearInterval(timerInterval);
+        eventSource.close();
+        document.getElementById('searchBtn').disabled = false;
+        document.getElementById('progressContainer').classList.add('hidden');
+
+        let msg = 'Erro ao buscar no Google Maps. Tente novamente.';
+        try {
+          if (e.data) {
+            const parsed = JSON.parse(e.data);
+            if (parsed.message) msg = parsed.message;
+          }
+        } catch (_) {}
+
+        document.getElementById('errorMessage').innerText = msg;
+        document.getElementById('errorBanner').classList.remove('hidden');
+      });
+    }
+
+    function renderResults(leads, duplicatesSkipped = 0) {
+      const tbody = document.getElementById('leadsTableBody');
+      const mobileContainer = document.getElementById('mobileCardsContainer');
+      tbody.innerHTML = '';
+      mobileContainer.innerHTML = '';
+
+      if (!leads || leads.length === 0) {
+        const emptyHtml = `
+          <div class="py-10 text-center text-slate-400 text-xs">
+            <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+            Nenhuma loja nova encontrada com esses filtros.<br>
+            ${duplicatesSkipped > 0 ? `<strong class="text-amber-400">${duplicatesSkipped} lojas repetidas já estavam salvas na memória e foram ignoradas.</strong><br>` : ''}
+            Tente aumentar o raio em km ou buscar por outro nicho.
+          </div>
+        `;
+        mobileContainer.innerHTML = emptyHtml;
+        tbody.innerHTML = `<tr><td colspan="6">${emptyHtml}</td></tr>`;
+        document.getElementById('resultsCard').classList.remove('hidden');
+        lucide.createIcons();
+        return;
+      }
+
+      const total = leads.length;
+      const noWebsiteCount = leads.filter(l => l.isWithoutWebsite).length;
+      const fewReviewsCount = leads.filter(l => l.reviewsCount <= 10).length;
+      const withPhoneCount = leads.filter(l => l.phone && l.phone !== 'Não informado').length;
+
+      document.getElementById('metricTotal').innerText = total;
+      document.getElementById('metricDuplicatesNote').innerText = `${duplicatesSkipped} repetidas ignoradas`;
+      document.getElementById('metricNoWebsite').innerText = noWebsiteCount;
+      document.getElementById('metricFewReviews').innerText = fewReviewsCount;
+      document.getElementById('metricWithPhone').innerText = withPhoneCount;
+      document.getElementById('badgeCount').innerText = `${total} lojas`;
+
+      document.getElementById('metricsSection').classList.remove('hidden');
+      document.getElementById('resultsCard').classList.remove('hidden');
+
+      leads.forEach((lead, index) => {
+        // ------------------------------
+        // 1. CARD NO CELULAR (MOBILE)
+        // ------------------------------
+        const card = document.createElement('div');
+        card.className = 'p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2.5 shadow-sm';
+
+        let websiteTag = lead.isWithoutWebsite
+          ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-950 text-rose-300 border border-rose-800">❌ SEM SITE</span>'
+          : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">✅ Tem Site</span>';
+
+        const flawsMobile = lead.flaws.length > 0
+          ? lead.flaws.map(f => `<span class="inline-block bg-slate-900 text-slate-300 px-2 py-0.5 rounded text-[10px] mr-1 border border-slate-800">${f}</span>`).join('')
+          : '';
+
+        let phoneLink = lead.phone && lead.phone !== 'Não informado'
+          ? `<a href="tel:${lead.phone.replace(/\D/g, '')}" class="text-emerald-400 font-mono font-bold text-xs flex items-center gap-1 hover:underline"><i data-lucide="phone" class="w-3 h-3"></i> ${lead.phone}</a>`
+          : `<span class="text-slate-500 text-[11px] italic">Telefone não informado</span>`;
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h4 class="font-bold text-white text-sm leading-tight">${escapeHtml(lead.name)}</h4>
+              <p class="text-[11px] text-slate-400 truncate max-w-[240px] mt-0.5">${escapeHtml(lead.category)} · ${escapeHtml(lead.address)}</p>
+            </div>
+            ${websiteTag}
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-1 border-t border-slate-900">
+            <div class="flex items-center gap-1 font-bold text-white">
+              ⭐ ${lead.rating} <span class="text-slate-400 font-normal text-[11px]">(${lead.reviewsCount} notas)</span>
+            </div>
+            <div>${phoneLink}</div>
+          </div>
+
+          ${flawsMobile ? `<div class="pt-0.5">${flawsMobile}</div>` : ''}
+
+          <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-900">
+            <button onclick="openCallModal(${index})"
+              class="py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+              <span>Ver o que falar</span>
+            </button>
+            <a href="${lead.mapsUrl}" target="_blank"
+              class="py-2.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 font-semibold rounded-xl text-xs flex items-center justify-center gap-1 border border-slate-800 transition">
+              <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+              <span>Abrir no Maps</span>
+            </a>
+          </div>
+        `;
+        mobileContainer.appendChild(card);
+
+        // ------------------------------
+        // 2. TABELA NO COMPUTADOR (DESKTOP)
+        // ------------------------------
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40 transition';
+
+        let storeLinks = `
+          <div class="space-y-1">
+            <a href="${lead.mapsUrl}" target="_blank" class="inline-flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-semibold">
+              <i data-lucide="map-pin" class="w-3 h-3"></i> Ficha no Maps
+            </a>
+        `;
+        if (lead.hasWebsite && lead.websiteUrl) {
+          storeLinks += `
+            <a href="${lead.websiteUrl}" target="_blank" class="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-200 block truncate max-w-[120px]">
+              <i data-lucide="globe" class="w-3 h-3 text-emerald-400"></i> Website
+            </a>
+          `;
+        } else if (lead.isWithoutWebsite) {
+          storeLinks += `
+            <span class="inline-flex items-center gap-1 text-[10px] text-rose-400 font-bold block">
+              <i data-lucide="x-circle" class="w-3 h-3"></i> SEM SITE
+            </span>
+          `;
+        }
+        storeLinks += `</div>`;
+
+        const flawsDesktop = lead.flaws.length > 0
+          ? lead.flaws.map(f => `<span class="inline-block bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-[10px] mr-1 mb-1 border border-slate-700 font-medium">${f}</span>`).join('')
+          : '<span class="text-slate-500 text-[11px]">Normal</span>';
+
+        let phoneDesktop = lead.phone && lead.phone !== 'Não informado'
+          ? `<a href="tel:${lead.phone.replace(/\D/g, '')}" class="text-slate-200 font-mono text-[11px] font-bold block hover:underline">${lead.phone}</a>`
+          : `<span class="text-slate-500 text-[11px] italic">Não informado</span>`;
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-4">
+            <div class="font-bold text-white text-sm">${escapeHtml(lead.name)}</div>
+            <div class="text-[11px] text-slate-400 truncate max-w-xs">${escapeHtml(lead.category)} · ${escapeHtml(lead.address)}</div>
+          </td>
+          <td class="py-3.5 px-3 whitespace-nowrap">
+            ${storeLinks}
+          </td>
+          <td class="py-3.5 px-3 whitespace-nowrap">
+            <div class="font-bold text-white flex items-center gap-1">
+              ⭐ ${lead.rating}
+              <span class="text-slate-400 font-normal text-[11px]">(${lead.reviewsCount} notas)</span>
+            </div>
+          </td>
+          <td class="py-3.5 px-3 whitespace-nowrap">
+            ${phoneDesktop}
+          </td>
+          <td class="py-3.5 px-3 max-w-xs">
+            ${flawsDesktop}
+          </td>
+          <td class="py-3.5 px-4 text-center whitespace-nowrap">
+            <button onclick="openCallModal(${index})"
+              class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-md text-xs flex items-center gap-1.5 transition mx-auto active:scale-95">
+              <i data-lucide="phone-call" class="w-3.5 h-3.5"></i>
+              <span>Ver o que falar</span>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // Modal de Ligação
+    function openCallModal(index) {
+      const lead = currentLeads[index];
+      if (!lead) return;
+
+      document.getElementById('modalStoreName').innerText = lead.name;
+      document.getElementById('modalPhone').innerText = lead.phone;
+      document.getElementById('modalCallBtn').href = `tel:${lead.phone.replace(/\D/g, '')}`;
+      document.getElementById('modalMapsLink').href = lead.mapsUrl;
+
+      const waBtn = document.getElementById('modalWaBtn');
+      if (lead.whatsapp) {
+        waBtn.classList.remove('hidden');
+        waBtn.href = `https://wa.me/${lead.whatsapp}?text=${encodeURIComponent(lead.pitch)}`;
+      } else {
+        waBtn.classList.add('hidden');
+      }
+
+      const script = lead.coldCallScript;
+      if (script) {
+        document.getElementById('modalPasso1').innerText = script.passo1_secretaria;
+        document.getElementById('modalPasso2').innerText = script.passo2_gancho;
+        document.getElementById('modalPasso3').innerText = script.passo3_pergunta_impacto;
+        document.getElementById('modalPasso4').innerText = script.passo5_fechamento_cta;
+      }
+
+      document.getElementById('callModal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeCallModal() {
+      document.getElementById('callModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
